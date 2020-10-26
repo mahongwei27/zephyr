@@ -31,6 +31,7 @@ LOG_MODULE_REGISTER(ssd16xx);
 #define SSD16XX_DC_FLAGS DT_INST_GPIO_FLAGS(0, dc_gpios)
 #define SSD16XX_DC_CNTRL DT_INST_GPIO_LABEL(0, dc_gpios)
 #define SSD16XX_CS_PIN DT_INST_SPI_DEV_CS_GPIOS_PIN(0)
+#define SSD16XX_CS_FLAGS DT_INST_SPI_DEV_CS_GPIOS_FLAGS(0)
 #if DT_INST_SPI_DEV_HAS_CS_GPIOS(0)
 #define SSD16XX_CS_CNTRL DT_INST_SPI_DEV_CS_GPIOS_LABEL(0)
 #endif
@@ -58,10 +59,10 @@ LOG_MODULE_REGISTER(ssd16xx);
 #define SSD16XX_TR_SCALE_FACTOR		256U
 
 struct ssd16xx_data {
-	struct device *reset;
-	struct device *dc;
-	struct device *busy;
-	struct device *spi_dev;
+	const struct device *reset;
+	const struct device *dc;
+	const struct device *busy;
+	const struct device *spi_dev;
 	struct spi_config spi_config;
 #if defined(SSD16XX_CS_CNTRL)
 	struct spi_cs_control cs_ctrl;
@@ -209,7 +210,7 @@ static int ssd16xx_blanking_on(const struct device *dev)
 
 static int ssd16xx_update_display(const struct device *dev)
 {
-	struct ssd16xx_data *driver = dev->driver_data;
+	struct ssd16xx_data *driver = dev->data;
 	int err;
 
 	err = ssd16xx_write_cmd(driver, SSD16XX_CMD_UPDATE_CTRL2,
@@ -227,7 +228,7 @@ static int ssd16xx_write(const struct device *dev, const uint16_t x,
 			 const struct display_buffer_descriptor *desc,
 			 const void *buf)
 {
-	struct ssd16xx_data *driver = dev->driver_data;
+	struct ssd16xx_data *driver = dev->data;
 	int err;
 	size_t buf_len;
 	uint16_t x_start;
@@ -383,10 +384,10 @@ static int ssd16xx_set_pixel_format(const struct device *dev,
 	return -ENOTSUP;
 }
 
-static int ssd16xx_clear_cntlr_mem(struct device *dev, uint8_t ram_cmd,
+static int ssd16xx_clear_cntlr_mem(const struct device *dev, uint8_t ram_cmd,
 				   bool update)
 {
-	struct ssd16xx_data *driver = dev->driver_data;
+	struct ssd16xx_data *driver = dev->data;
 	uint8_t clear_page[EPD_PANEL_WIDTH];
 	uint16_t panel_h = EPD_PANEL_HEIGHT /
 			EPD_PANEL_NUMOF_ROWS_PER_PAGE;
@@ -432,9 +433,9 @@ static int ssd16xx_clear_cntlr_mem(struct device *dev, uint8_t ram_cmd,
 	return 0;
 }
 
-static inline int ssd16xx_load_ws_from_otp(struct device *dev)
+static inline int ssd16xx_load_ws_from_otp(const struct device *dev)
 {
-	struct ssd16xx_data *driver = dev->driver_data;
+	struct ssd16xx_data *driver = dev->data;
 	uint8_t tmp[2];
 
 #if DT_INST_NODE_HAS_PROP(0, tssv)
@@ -499,10 +500,10 @@ static inline int ssd16xx_load_ws_from_otp(struct device *dev)
 #endif
 }
 
-static int ssd16xx_load_ws_initial(struct device *dev)
+static int ssd16xx_load_ws_initial(const struct device *dev)
 {
 #if DT_INST_NODE_HAS_PROP(0, lut_initial)
-	struct ssd16xx_data *driver = dev->driver_data;
+	struct ssd16xx_data *driver = dev->data;
 
 	if (ssd16xx_write_cmd(driver, SSD16XX_CMD_UPDATE_LUT,
 			      ssd16xx_lut_initial,
@@ -518,10 +519,10 @@ static int ssd16xx_load_ws_initial(struct device *dev)
 	return 0;
 }
 
-static int ssd16xx_load_ws_default(struct device *dev)
+static int ssd16xx_load_ws_default(const struct device *dev)
 {
 #if DT_INST_NODE_HAS_PROP(0, lut_default)
-	struct ssd16xx_data *driver = dev->driver_data;
+	struct ssd16xx_data *driver = dev->data;
 
 	if (ssd16xx_write_cmd(driver, SSD16XX_CMD_UPDATE_LUT,
 			      ssd16xx_lut_default,
@@ -535,12 +536,12 @@ static int ssd16xx_load_ws_default(struct device *dev)
 	return 0;
 }
 
-static int ssd16xx_controller_init(struct device *dev)
+static int ssd16xx_controller_init(const struct device *dev)
 {
 	int err;
 	uint8_t tmp[3];
 	size_t len;
-	struct ssd16xx_data *driver = dev->driver_data;
+	struct ssd16xx_data *driver = dev->data;
 
 	LOG_DBG("");
 
@@ -640,9 +641,9 @@ static int ssd16xx_controller_init(struct device *dev)
 	return ssd16xx_clear_cntlr_mem(dev, SSD16XX_CMD_WRITE_RAM, true);
 }
 
-static int ssd16xx_init(struct device *dev)
+static int ssd16xx_init(const struct device *dev)
 {
-	struct ssd16xx_data *driver = dev->driver_data;
+	struct ssd16xx_data *driver = dev->data;
 
 	LOG_DBG("");
 
@@ -692,6 +693,7 @@ static int ssd16xx_init(struct device *dev)
 	}
 
 	driver->cs_ctrl.gpio_pin = SSD16XX_CS_PIN;
+	driver->cs_ctrl.gpio_dt_flags = SSD16XX_CS_FLAGS;
 	driver->cs_ctrl.delay = 0U;
 	driver->spi_config.cs = &driver->cs_ctrl;
 #endif

@@ -99,7 +99,7 @@ int bt_mesh_pb_gatt_close(struct bt_conn *conn)
 	BT_DBG("conn %p", conn);
 
 	if (link.conn != conn) {
-		BT_ERR("Not connected");
+		BT_DBG("Not connected");
 		return -ENOTCONN;
 	}
 
@@ -139,6 +139,11 @@ static void clear_tx(void)
 void pb_gatt_init(void)
 {
 	k_delayed_work_init(&link.prot_timer, protocol_timeout);
+}
+
+void pb_gatt_reset(void)
+{
+	reset_state();
 }
 
 const struct prov_bearer pb_gatt = {

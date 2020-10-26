@@ -32,6 +32,7 @@ LOG_MODULE_REGISTER(gd7965, CONFIG_DISPLAY_LOG_LEVEL);
 #define GD7965_DC_FLAGS DT_INST_GPIO_FLAGS(0, dc_gpios)
 #define GD7965_DC_CNTRL DT_INST_GPIO_LABEL(0, dc_gpios)
 #define GD7965_CS_PIN DT_INST_SPI_DEV_CS_GPIOS_PIN(0)
+#define GD7965_CS_FLAGS DT_INST_SPI_DEV_CS_GPIOS_FLAGS(0)
 #if DT_INST_SPI_DEV_HAS_CS_GPIOS(0)
 #define GD7965_CS_CNTRL DT_INST_SPI_DEV_CS_GPIOS_LABEL(0)
 #endif
@@ -56,10 +57,10 @@ LOG_MODULE_REGISTER(gd7965, CONFIG_DISPLAY_LOG_LEVEL);
 
 
 struct gd7965_data {
-	struct device *reset;
-	struct device *dc;
-	struct device *busy;
-	struct device *spi_dev;
+	const struct device *reset;
+	const struct device *dc;
+	const struct device *busy;
+	const struct device *spi_dev;
 	struct spi_config spi_config;
 #if defined(GD7965_CS_CNTRL)
 	struct spi_cs_control cs_ctrl;
@@ -104,28 +105,28 @@ static inline void gd7965_busy_wait(struct gd7965_data *driver)
 	while (pin > 0) {
 		__ASSERT(pin >= 0, "Failed to get pin level");
 		LOG_DBG("wait %u", pin);
-		k_sleep(GD7965_BUSY_DELAY);
+		k_sleep(K_MSEC(GD7965_BUSY_DELAY));
 		pin = gpio_pin_get(driver->busy, GD7965_BUSY_PIN);
 	}
 }
 
 static int gd7965_update_display(const struct device *dev)
 {
-	struct gd7965_data *driver = dev->driver_data;
+	struct gd7965_data *driver = dev->data;
 
 	LOG_DBG("Trigger update sequence");
 	if (gd7965_write_cmd(driver, GD7965_CMD_DRF, NULL, 0)) {
 		return -EIO;
 	}
 
-	k_sleep(GD7965_BUSY_DELAY);
+	k_sleep(K_MSEC(GD7965_BUSY_DELAY));
 
 	return 0;
 }
 
 static int gd7965_blanking_off(const struct device *dev)
 {
-	struct gd7965_data *driver = dev->driver_data;
+	struct gd7965_data *driver = dev->data;
 
 	if (blanking_on) {
 		/* Update EPD pannel in normal mode */
@@ -151,7 +152,7 @@ static int gd7965_write(const struct device *dev, const uint16_t x, const uint16
 			const struct display_buffer_descriptor *desc,
 			const void *buf)
 {
-	struct gd7965_data *driver = dev->driver_data;
+	struct gd7965_data *driver = dev->data;
 	uint16_t x_end_idx = x + desc->width - 1;
 	uint16_t y_end_idx = y + desc->height - 1;
 	uint8_t ptl[GD7965_PTL_REG_LENGTH] = {0};
@@ -279,7 +280,7 @@ static int gd7965_set_pixel_format(const struct device *dev,
 	return -ENOTSUP;
 }
 
-static int gd7965_clear_and_write_buffer(struct device *dev,
+static int gd7965_clear_and_write_buffer(const struct device *dev,
 					 uint8_t pattern, bool update)
 {
 	struct display_buffer_descriptor desc = {
@@ -311,15 +312,15 @@ static int gd7965_clear_and_write_buffer(struct device *dev,
 	return 0;
 }
 
-static int gd7965_controller_init(struct device *dev)
+static int gd7965_controller_init(const struct device *dev)
 {
-	struct gd7965_data *driver = dev->driver_data;
+	struct gd7965_data *driver = dev->data;
 	uint8_t tmp[GD7965_TRES_REG_LENGTH];
 
 	gpio_pin_set(driver->reset, GD7965_RESET_PIN, 1);
-	k_sleep(GD7965_RESET_DELAY);
+	k_sleep(K_MSEC(GD7965_RESET_DELAY));
 	gpio_pin_set(driver->reset, GD7965_RESET_PIN, 0);
-	k_sleep(GD7965_RESET_DELAY);
+	k_sleep(K_MSEC(GD7965_RESET_DELAY));
 	gd7965_busy_wait(driver);
 
 	LOG_DBG("Initialize GD7965 controller");
@@ -339,7 +340,7 @@ static int gd7965_controller_init(struct device *dev)
 		return -EIO;
 	}
 
-	k_sleep(GD7965_PON_DELAY);
+	k_sleep(K_MSEC(GD7965_PON_DELAY));
 	gd7965_busy_wait(driver);
 
 	/* Pannel settings, KW mode */
@@ -389,9 +390,9 @@ static int gd7965_controller_init(struct device *dev)
 	return 0;
 }
 
-static int gd7965_init(struct device *dev)
+static int gd7965_init(const struct device *dev)
 {
-	struct gd7965_data *driver = dev->driver_data;
+	struct gd7965_data *driver = dev->data;
 
 	LOG_DBG("");
 
@@ -441,6 +442,7 @@ static int gd7965_init(struct device *dev)
 	}
 
 	driver->cs_ctrl.gpio_pin = GD7965_CS_PIN;
+	driver->cs_ctrl.gpio_dt_flags = GD7965_CS_FLAGS;
 	driver->cs_ctrl.delay = 0U;
 	driver->spi_config.cs = &driver->cs_ctrl;
 #endif

@@ -55,6 +55,7 @@ struct mcp23s17_config {
 	const uint32_t freq;
 	const char *const cs_dev;
 	const uint32_t cs_pin;
+	const uint8_t cs_flags;
 };
 
 /** Runtime driver data */
@@ -63,7 +64,7 @@ struct mcp23s17_drv_data {
 	struct gpio_driver_config data;
 
 	/** Master SPI device */
-	struct device *spi;
+	const struct device *spi;
 	struct spi_config spi_cfg;
 	struct spi_cs_control mcp23s17_cs_ctrl;
 

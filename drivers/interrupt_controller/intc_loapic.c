@@ -65,6 +65,15 @@ uint32_t loapic_suspend_buf[LOPIC_SUSPEND_BITS_REQD / 32] = {0};
 static uint32_t loapic_device_power_state = DEVICE_PM_ACTIVE_STATE;
 #endif
 
+#ifdef DEVICE_MMIO_IS_IN_RAM
+mm_reg_t z_loapic_regs;
+#endif
+
+void send_eoi(void)
+{
+	x86_write_xapic(LOAPIC_EOI, 0);
+}
+
 /**
  * @brief Enable and initialize the local APIC.
  *
@@ -75,6 +84,10 @@ void z_loapic_enable(unsigned char cpu_number)
 {
 	int32_t loApicMaxLvt; /* local APIC Max LVT */
 
+#ifdef DEVICE_MMIO_IS_IN_RAM
+	device_map(&z_loapic_regs, CONFIG_LOAPIC_BASE_ADDRESS, 0x1000,
+		   K_MEM_CACHE_NONE);
+#endif /* DEVICE_MMIO_IS_IN_RAM */
 #ifndef CONFIG_X2APIC
 	/*
 	 * in xAPIC and flat model, bits 24-31 in LDR (Logical APIC ID) are
@@ -173,7 +186,7 @@ void z_loapic_enable(unsigned char cpu_number)
  * kernel runs through its device initializations, so this is unneeded.
  */
 
-static int loapic_init(struct device *unused)
+static int loapic_init(const struct device *unused)
 {
 	ARG_UNUSED(unused);
 	return 0;
@@ -320,7 +333,7 @@ int z_irq_controller_isr_vector_get(void)
 }
 
 #ifdef CONFIG_DEVICE_POWER_MANAGEMENT
-static int loapic_suspend(struct device *port)
+static int loapic_suspend(const struct device *port)
 {
 	volatile uint32_t lvt; /* local vector table entry value */
 	int loapic_irq;
@@ -348,7 +361,7 @@ static int loapic_suspend(struct device *port)
 	return 0;
 }
 
-int loapic_resume(struct device *port)
+int loapic_resume(const struct device *port)
 {
 	int loapic_irq;
 
@@ -381,7 +394,8 @@ int loapic_resume(struct device *port)
 * Implements the driver control management functionality
 * the *context may include IN data or/and OUT data
 */
-static int loapic_device_ctrl(struct device *port, uint32_t ctrl_command,
+static int loapic_device_ctrl(const struct device *port,
+			      uint32_t ctrl_command,
 			      void *context, device_pm_cb cb, void *arg)
 {
 	int ret = 0;

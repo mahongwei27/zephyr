@@ -65,7 +65,7 @@ extern void pcie_conf_write(pcie_bdf_t bdf, unsigned int reg, uint32_t data);
  * @brief Probe for the presence of a PCI(e) endpoint.
  *
  * @param bdf the endpoint to probe
- * @param id the endpoint ID to expect, or PCI_ID_ANY for "any device"
+ * @param id the endpoint ID to expect, or PCIE_ID_NONE for "any device"
  * @return true if the device is present, false otherwise
  */
 extern bool pcie_probe(pcie_bdf_t bdf, pcie_id_t id);
@@ -74,25 +74,15 @@ extern bool pcie_probe(pcie_bdf_t bdf, pcie_id_t id);
  * @brief Get the nth MMIO address assigned to an endpoint.
  * @param bdf the PCI(e) endpoint
  * @param index (0-based) index
- * @return the (32-bit) address, or PCI_CONF_BAR_NONE if nonexistent.
+ * @return the address, or PCIE_CONF_BAR_NONE if nonexistent.
  *
  * A PCI(e) endpoint has 0 or more memory-mapped regions. This function
  * allows the caller to enumerate them by calling with index=0..n. If
- * PCI_CONF_BAR_NONE is returned, there are no further regions. The indices
+ * PCIE_CONF_BAR_NONE is returned, there are no further regions. The indices
  * are order-preserving with respect to the endpoint BARs: e.g., index 0
  * will return the lowest-numbered memory BAR on the endpoint.
  */
-extern uint32_t pcie_get_mbar(pcie_bdf_t bdf, unsigned int index);
-
-/**
- * @brief Get the nth I/O address assigned to an endpoint.
- * @param bdf the PCI(e) endpoint
- * @param index (0-based) index
- * @return the (32-bit) address, or PCI_CONF_BAR_NONE if nonexistent.
- *
- * Analogous to pcie_get_mbar(), except returns I/O region data.
- */
-extern uint32_t pcie_get_iobar(pcie_bdf_t bdf, unsigned int index);
+extern uintptr_t pcie_get_mbar(pcie_bdf_t bdf, unsigned int index);
 
 /**
  * @brief Set or reset bits in the endpoint command/status register.
@@ -119,7 +109,7 @@ extern unsigned int pcie_wired_irq(pcie_bdf_t bdf);
  *
  * If MSI is enabled and the endpoint supports it, the endpoint will
  * be configured to generate the specified IRQ via MSI. Otherwise, it
- * is assumed that the IRQ IRQ has been routed by the boot firmware
+ * is assumed that the IRQ has been routed by the boot firmware
  * to the specified IRQ, and the IRQ is enabled (at the I/O APIC, or
  * wherever appropriate).
  */
@@ -180,7 +170,7 @@ extern void pcie_irq_enable(pcie_bdf_t bdf, unsigned int irq);
 #define PCIE_CONF_BAR_IO(w)		(((w) & 0x00000001U) == 0x00000001U)
 #define PCIE_CONF_BAR_MEM(w)		(((w) & 0x00000001U) != 0x00000001U)
 #define PCIE_CONF_BAR_64(w)		(((w) & 0x00000006U) == 0x00000004U)
-#define PCIE_CONF_BAR_ADDR(w)		((w) & 0xFFFFFFF0U)
+#define PCIE_CONF_BAR_ADDR(w)		((w) & ~0xfUL)
 #define PCIE_CONF_BAR_NONE		0U
 
 /*

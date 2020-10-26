@@ -20,6 +20,7 @@ LOG_MODULE_REGISTER(LOG_DOMAIN);
 #include <drivers/gpio.h>
 #include <device.h>
 #include <init.h>
+#include <random/rand32.h>
 
 #include <net/net_context.h>
 #include <net/net_if.h>
@@ -148,12 +149,12 @@ NET_BUF_POOL_DEFINE(mdm_recv_pool, MDM_RECV_MAX_BUF, MDM_RECV_BUF_SIZE,
 static uint8_t mdm_recv_buf[MDM_MAX_DATA_LENGTH];
 
 /* RX thread structures */
-K_THREAD_STACK_DEFINE(wncm14a2a_rx_stack,
+K_KERNEL_STACK_DEFINE(wncm14a2a_rx_stack,
 		       CONFIG_MODEM_WNCM14A2A_RX_STACK_SIZE);
 struct k_thread wncm14a2a_rx_thread;
 
 /* RX thread work queue */
-K_THREAD_STACK_DEFINE(wncm14a2a_workq_stack,
+K_KERNEL_STACK_DEFINE(wncm14a2a_workq_stack,
 		      CONFIG_MODEM_WNCM14A2A_RX_WORKQ_STACK_SIZE);
 static struct k_work_q wncm14a2a_workq;
 
@@ -182,7 +183,7 @@ struct wncm14a2a_iface_ctx {
 	uint8_t mac_addr[6];
 
 	/* GPIO PORT devices */
-	struct device *gpio_port_dev[MAX_MDM_CONTROL_PINS];
+	const struct device *gpio_port_dev[MAX_MDM_CONTROL_PINS];
 
 	/* RX specific attributes */
 	struct mdm_receiver_context mdm_ctx;
@@ -1440,7 +1441,7 @@ error:
 	return;
 }
 
-static int wncm14a2a_init(struct device *dev)
+static int wncm14a2a_init(const struct device *dev)
 {
 	int i, ret = 0;
 
@@ -1461,7 +1462,7 @@ static int wncm14a2a_init(struct device *dev)
 	/* initialize the work queue */
 	k_work_q_start(&wncm14a2a_workq,
 		       wncm14a2a_workq_stack,
-		       K_THREAD_STACK_SIZEOF(wncm14a2a_workq_stack),
+		       K_KERNEL_STACK_SIZEOF(wncm14a2a_workq_stack),
 		       K_PRIO_COOP(7));
 
 	ictx.last_socket_id = 0;
@@ -1484,7 +1485,9 @@ static int wncm14a2a_init(struct device *dev)
 	ictx.mdm_ctx.data_manufacturer = ictx.mdm_manufacturer;
 	ictx.mdm_ctx.data_model = ictx.mdm_model;
 	ictx.mdm_ctx.data_revision = ictx.mdm_revision;
+#ifdef CONFIG_MODEM_SIM_NUMBERS
 	ictx.mdm_ctx.data_imei = ictx.mdm_imei;
+#endif
 
 	ret = mdm_receiver_register(&ictx.mdm_ctx, MDM_UART_DEV_NAME,
 				    mdm_recv_buf, sizeof(mdm_recv_buf));
@@ -1495,7 +1498,7 @@ static int wncm14a2a_init(struct device *dev)
 
 	/* start RX thread */
 	k_thread_create(&wncm14a2a_rx_thread, wncm14a2a_rx_stack,
-			K_THREAD_STACK_SIZEOF(wncm14a2a_rx_stack),
+			K_KERNEL_STACK_SIZEOF(wncm14a2a_rx_stack),
 			(k_thread_entry_t) wncm14a2a_rx,
 			NULL, NULL, NULL, K_PRIO_COOP(7), 0, K_NO_WAIT);
 
@@ -1817,9 +1820,9 @@ static struct net_offload offload_funcs = {
 	.put = offload_put,
 };
 
-static inline uint8_t *wncm14a2a_get_mac(struct device *dev)
+static inline uint8_t *wncm14a2a_get_mac(const struct device *dev)
 {
-	struct wncm14a2a_iface_ctx *ctx = dev->driver_data;
+	struct wncm14a2a_iface_ctx *ctx = dev->data;
 
 	ctx->mac_addr[0] = 0x00;
 	ctx->mac_addr[1] = 0x10;
@@ -1832,8 +1835,8 @@ static inline uint8_t *wncm14a2a_get_mac(struct device *dev)
 
 static void offload_iface_init(struct net_if *iface)
 {
-	struct device *dev = net_if_get_device(iface);
-	struct wncm14a2a_iface_ctx *ctx = dev->driver_data;
+	const struct device *dev = net_if_get_device(iface);
+	struct wncm14a2a_iface_ctx *ctx = dev->data;
 
 	iface->if_dev->offload = &offload_funcs;
 	net_if_set_link_addr(iface, wncm14a2a_get_mac(dev),

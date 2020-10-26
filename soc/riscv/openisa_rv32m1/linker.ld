@@ -36,7 +36,7 @@
 #define ROM_BASE (DT_REG_ADDR(DT_CHOSEN(zephyr_code_partition)))
 #define ROM_SIZE (DT_REG_SIZE(DT_CHOSEN(zephyr_code_partition)))
 
-#define VECTOR_BASE (ROM_BASE + CONFIG_TEXT_SECTION_OFFSET)
+#define VECTOR_BASE (ROM_BASE + CONFIG_ROM_START_OFFSET)
 
 #else
 
@@ -122,6 +122,7 @@ SECTIONS
     _image_rodata_start = .;
 
 #include <linker/common-rom.ld>
+#include <linker/thread-local-storage.ld>
 
     SECTION_PROLOGUE(_RODATA_SECTION_NAME,,)
 	{

@@ -8,6 +8,7 @@
 #include <zephyr.h>
 
 #include <shell/shell.h>
+#include <sys/util.h>
 
 #include <stdlib.h>
 #include <string.h>
@@ -20,7 +21,8 @@
 static uint8_t __aligned(4) test_arr[TEST_ARR_SIZE];
 
 static int parse_helper(const struct shell *shell, size_t *argc,
-		char **argv[], struct device **flash_dev, uint32_t *addr)
+		char **argv[], const struct device * *flash_dev,
+		uint32_t *addr)
 {
 	char *endptr;
 
@@ -46,7 +48,7 @@ static int parse_helper(const struct shell *shell, size_t *argc,
 
 static int cmd_erase(const struct shell *shell, size_t argc, char *argv[])
 {
-	struct device *flash_dev;
+	const struct device *flash_dev;
 	uint32_t page_addr;
 	int result;
 	uint32_t size;
@@ -72,9 +74,11 @@ static int cmd_erase(const struct shell *shell, size_t argc, char *argv[])
 		size = info.size;
 	}
 
-	flash_write_protection_set(flash_dev, 0);
+	flash_write_protection_set(flash_dev, false);
 
 	result = flash_erase(flash_dev, page_addr, size);
+
+	flash_write_protection_set(flash_dev, true);
 
 	if (result) {
 		shell_error(shell, "Erase Failed, code %d.", result);
@@ -89,7 +93,7 @@ static int cmd_write(const struct shell *shell, size_t argc, char *argv[])
 {
 	uint32_t check_array[BUF_ARRAY_CNT];
 	uint32_t buf_array[BUF_ARRAY_CNT];
-	struct device *flash_dev;
+	const struct device *flash_dev;
 	uint32_t w_addr;
 	int ret;
 	int j = 0;
@@ -110,7 +114,7 @@ static int cmd_write(const struct shell *shell, size_t argc, char *argv[])
 		j++;
 	}
 
-	flash_write_protection_set(flash_dev, 0);
+	flash_write_protection_set(flash_dev, false);
 
 	if (flash_write(flash_dev, w_addr, buf_array,
 			sizeof(buf_array[0]) * j) != 0) {
@@ -134,8 +138,10 @@ static int cmd_write(const struct shell *shell, size_t argc, char *argv[])
 
 static int cmd_read(const struct shell *shell, size_t argc, char *argv[])
 {
-	struct device *flash_dev;
+	const struct device *flash_dev;
 	uint32_t addr;
+	int todo;
+	int upto;
 	int cnt;
 	int ret;
 
@@ -150,16 +156,17 @@ static int cmd_read(const struct shell *shell, size_t argc, char *argv[])
 		cnt = 1;
 	}
 
-	while (cnt--) {
-		uint32_t data;
+	for (upto = 0; upto < cnt; upto += todo) {
+		uint8_t data[SHELL_HEXDUMP_BYTES_IN_LINE];
 
-		ret = flash_read(flash_dev, addr, &data, sizeof(data));
+		todo = MIN(cnt - upto, SHELL_HEXDUMP_BYTES_IN_LINE);
+		ret = flash_read(flash_dev, addr, data, todo);
 		if (ret != 0) {
 			shell_error(shell, "Read ERROR!");
 			return -EIO;
 		}
-		shell_print(shell, "0x%08x ", data);
-		addr += sizeof(data);
+		shell_hexdump_line(shell, addr, data, todo);
+		addr += todo;
 	}
 
 	shell_print(shell, "");
@@ -169,7 +176,7 @@ static int cmd_read(const struct shell *shell, size_t argc, char *argv[])
 
 static int cmd_test(const struct shell *shell, size_t argc, char *argv[])
 {
-	struct device *flash_dev;
+	const struct device *flash_dev;
 	uint32_t repeat;
 	int result;
 	uint32_t addr;
@@ -188,32 +195,43 @@ static int cmd_test(const struct shell *shell, size_t argc, char *argv[])
 		return -EINVAL;
 	}
 
-	flash_write_protection_set(flash_dev, 0);
-
 	for (uint32_t i = 0; i < size; i++) {
 		test_arr[i] = (uint8_t)i;
 	}
 
+	result = 0;
+
 	while (repeat--) {
+		flash_write_protection_set(flash_dev, false);
+
 		result = flash_erase(flash_dev, addr, size);
+
 		if (result) {
 			shell_error(shell, "Erase Failed, code %d.", result);
-			return -EIO;
+			break;
 		}
 
 		shell_print(shell, "Erase OK.");
 
-		if (flash_write(flash_dev, addr, test_arr, size) != 0) {
+		flash_write_protection_set(flash_dev, false);
+
+		result = flash_write(flash_dev, addr, test_arr, size);
+
+		if (result) {
 			shell_error(shell, "Write internal ERROR!");
-			return -EIO;
+			break;
 		}
 
 		shell_print(shell, "Write OK.");
 	}
 
-	shell_print(shell, "Erase-Write test done.");
+	flash_write_protection_set(flash_dev, true);
 
-	return 0;
+	if (result == 0) {
+		shell_print(shell, "Erase-Write test done.");
+	}
+
+	return result;
 }
 
 static void device_name_get(size_t idx, struct shell_static_entry *entry);
@@ -222,7 +240,7 @@ SHELL_DYNAMIC_CMD_CREATE(dsub_device_name, device_name_get);
 
 static void device_name_get(size_t idx, struct shell_static_entry *entry)
 {
-	struct device *dev = shell_device_lookup(idx, NULL);
+	const struct device *dev = shell_device_lookup(idx, NULL);
 
 	entry->syntax = (dev != NULL) ? dev->name : NULL;
 	entry->handler = NULL;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 Intel Corporation
+ * Copyright (c) 2017, 2020 Intel Corporation
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -10,9 +10,14 @@
 #include "test_syscalls.h"
 
 #define BUF_SIZE	32
+#define SLEEP_MS_LONG	15000
 
-#if defined(CONFIG_BOARD_NUCLEO_F429ZI) || defined(CONFIG_BOARD_NUCLEO_F207ZG)
+#if defined(CONFIG_BOARD_NUCLEO_F429ZI) || defined(CONFIG_BOARD_NUCLEO_F207ZG) \
+	|| defined(CONFIG_BOARD_NUCLEO_L073RZ)
 #define FAULTY_ADDRESS 0x0FFFFFFF
+#elif CONFIG_MMU
+/* Just past the permanent RAM mapping should be a non-present page */
+#define FAULTY_ADDRESS (CONFIG_SRAM_BASE_ADDRESS + (CONFIG_SRAM_SIZE * 1024UL))
 #else
 #define FAULTY_ADDRESS 0xFFFFFFF0
 #endif
@@ -178,8 +183,10 @@ void test_string_nlen(void)
 	/* Skip this scenario for nsim_sem emulated board, unfortunately
 	 * the emulator doesn't set up memory as specified in DTS and poking
 	 * this address doesn't fault
+	 * Also skip this scenario for em_starterkit_7d, which won't generate
+	 * exceptions when unmapped address is accessed.
 	 */
-#if !(defined(CONFIG_BOARD_NSIM) && defined(CONFIG_SOC_NSIM_SEM))
+#if !((defined(CONFIG_BOARD_NSIM) && defined(CONFIG_SOC_NSIM_SEM)) || defined(CONFIG_SOC_EMSK_EM7D))
 	/* Try to blow up the kernel */
 	ret = string_nlen((char *)FAULTY_ADDRESS, BUF_SIZE, &err);
 	zassert_equal(err, -1, "nonsense string address did not fault");
@@ -325,10 +332,11 @@ void test_syscall_torture(void)
 	}
 
 	/* Let the torture threads hog the system for 15 seconds before we
-	 * abort them. They will all be hammering the cpu(s) with system calls,
+	 * abort them.
+	 * They will all be hammering the cpu(s) with system calls,
 	 * hopefully smoking out any issues and causing a crash.
 	 */
-	k_msleep(15000);
+	k_sleep(K_MSEC(SLEEP_MS_LONG));
 
 	for (i = 0; i < NR_THREADS; i++) {
 		k_thread_abort(&torture_threads[i]);

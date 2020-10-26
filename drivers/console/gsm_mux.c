@@ -17,10 +17,8 @@ LOG_MODULE_REGISTER(gsm_mux, CONFIG_GSM_MUX_LOG_LEVEL);
 #include "gsm_mux.h"
 
 /* Default values are from the specification 07.10 */
-#define T1 100  /* 100 ms */
-#define T2 340  /* 333 ms */
-#define T1_MSEC K_MSEC(T1)
-#define T2_MSEC K_MSEC(T2)
+#define T1_MSEC 100  /* 100 ms */
+#define T2_MSEC 340  /* 333 ms */
 
 #define N1 256 /* default I frame size, GSM 07.10 ch 6.2.2.1 */
 #define N2 3   /* retry 3 times */
@@ -77,7 +75,7 @@ struct gsm_mux {
 	/* UART device to use. This device is the real UART, not the
 	 * muxed one.
 	 */
-	struct device *uart;
+	const struct device *uart;
 
 	/* Buf to use when TX mux packet (hdr + data). For RX it only contains
 	 * the data (not hdr).
@@ -136,7 +134,7 @@ struct gsm_dlci {
 	dlci_command_cb_t command_cb;
 	gsm_mux_dlci_created_cb_t dlci_created_cb;
 	void *user_data;
-	struct device *uart;
+	const struct device *uart;
 	enum gsm_dlci_state state;
 	enum gsm_dlci_mode mode;
 	int num;
@@ -469,7 +467,7 @@ static void dlci_run_timer(uint32_t current_time)
 	}
 
 	if (new_timer != UINT_MAX) {
-		k_delayed_work_submit(&t1_timer, new_timer);
+		k_delayed_work_submit(&t1_timer, K_MSEC(new_timer));
 	}
 }
 
@@ -634,7 +632,7 @@ static void gsm_mux_t2_timeout(struct k_work *work)
 
 	if (entry) {
 		k_delayed_work_submit(&mux->t2_timer,
-				      K_MSEC(entry->req_start + T2 -
+				      K_MSEC(entry->req_start + T2_MSEC -
 					     current_time));
 	}
 }
@@ -677,7 +675,7 @@ static int gsm_mux_send_control_message(struct gsm_mux *mux, uint8_t dlci_addres
 
 	/* Let's start the timer if necessary */
 	if (!k_delayed_work_remaining_get(&mux->t2_timer)) {
-		k_delayed_work_submit(&mux->t2_timer, T2_MSEC);
+		k_delayed_work_submit(&mux->t2_timer, K_MSEC(T2_MSEC));
 	}
 
 	return gsm_mux_modem_send(mux, buf->data, buf->len);
@@ -977,7 +975,8 @@ static struct gsm_dlci *gsm_dlci_get_free(void)
 }
 
 static struct gsm_dlci *gsm_dlci_alloc(struct gsm_mux *mux, uint8_t address,
-		struct device *uart, gsm_mux_dlci_created_cb_t dlci_created_cb,
+		const struct device *uart,
+		gsm_mux_dlci_created_cb_t dlci_created_cb,
 		void *user_data)
 {
 	struct gsm_dlci *dlci;
@@ -1039,7 +1038,7 @@ static int gsm_mux_process_pkt(struct gsm_mux *mux)
 		}
 
 		if (dlci == NULL) {
-			struct device *uart;
+			const struct device *uart;
 
 			uart = uart_mux_find(dlci_address);
 			if (uart == NULL) {
@@ -1400,7 +1399,7 @@ static void dlci_done(struct gsm_dlci *dlci, bool connected)
 }
 
 int gsm_dlci_create(struct gsm_mux *mux,
-		    struct device *uart,
+		    const struct device *uart,
 		    int dlci_address,
 		    gsm_mux_dlci_created_cb_t dlci_created_cb,
 		    void *user_data,
@@ -1440,7 +1439,7 @@ int gsm_dlci_id(struct gsm_dlci *dlci)
 	return dlci->num;
 }
 
-struct gsm_mux *gsm_mux_create(struct device *uart)
+struct gsm_mux *gsm_mux_create(const struct device *uart)
 {
 	struct gsm_mux *mux = NULL;
 	int i;
@@ -1469,8 +1468,8 @@ struct gsm_mux *gsm_mux_create(struct device *uart)
 		mux->mru = CONFIG_GSM_MUX_MRU_DEFAULT_LEN;
 		mux->retries = N2;
 		mux->t1_timeout_value = CONFIG_GSM_MUX_T1_TIMEOUT ?
-			CONFIG_GSM_MUX_T1_TIMEOUT : T1;
-		mux->t2_timeout_value = T2;
+			CONFIG_GSM_MUX_T1_TIMEOUT : T1_MSEC;
+		mux->t2_timeout_value = T2_MSEC;
 		mux->is_initiator = CONFIG_GSM_MUX_INITIATOR;
 		mux->state = GSM_MUX_SOF;
 		mux->buf = NULL;
@@ -1499,6 +1498,22 @@ int gsm_mux_send(struct gsm_mux *mux, uint8_t dlci_address,
 
 	/* Mux the data and send to UART */
 	return gsm_mux_send_data_msg(mux, true, dlci, FT_UIH, buf, size);
+}
+
+void gsm_mux_detach(struct gsm_mux *mux)
+{
+	struct gsm_dlci *dlci;
+
+	for (int i = 0; i < ARRAY_SIZE(dlcis); i++) {
+		dlci = &dlcis[i];
+
+		if (mux != dlci->mux || !dlci->in_use) {
+			continue;
+		}
+
+		dlci->in_use = false;
+		sys_slist_prepend(&dlci_free_entries, &dlci->node);
+	}
 }
 
 void gsm_mux_init(void)

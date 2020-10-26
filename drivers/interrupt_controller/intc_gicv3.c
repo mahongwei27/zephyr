@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <assert.h>
+#include <sys/__assert.h>
 #include <sw_isr_table.h>
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 #include <drivers/interrupt_controller/gic.h>
@@ -54,15 +54,17 @@ void arm_gic_irq_set_priority(unsigned int intid,
 	sys_write8(prio & GIC_PRI_MASK, IPRIORITYR(base, intid));
 
 	/* Interrupt type config */
-	idx = intid / GIC_NUM_CFG_PER_REG;
-	shift = (intid & (GIC_NUM_CFG_PER_REG - 1)) * 2;
+	if (!GIC_IS_SGI(intid)) {
+		idx = intid / GIC_NUM_CFG_PER_REG;
+		shift = (intid & (GIC_NUM_CFG_PER_REG - 1)) * 2;
 
-	val = sys_read32(ICFGR(base, idx));
-	val &= ~(GICD_ICFGR_MASK << shift);
-	if (flags & IRQ_TYPE_EDGE) {
-		val |= (GICD_ICFGR_TYPE << shift);
+		val = sys_read32(ICFGR(base, idx));
+		val &= ~(GICD_ICFGR_MASK << shift);
+		if (flags & IRQ_TYPE_EDGE) {
+			val |= (GICD_ICFGR_TYPE << shift);
+		}
+		sys_write32(val, ICFGR(base, idx));
 	}
-	sys_write32(val, ICFGR(base, idx));
 }
 
 void arm_gic_irq_enable(unsigned int intid)
@@ -121,6 +123,27 @@ void arm_gic_eoi(unsigned int intid)
 
 	/* (AP -> Pending) Or (Active -> Inactive) or (AP to AP) nested case */
 	write_sysreg(intid, ICC_EOIR1_EL1);
+}
+
+void gic_raise_sgi(unsigned int sgi_id, uint64_t target_aff,
+		   uint16_t target_list)
+{
+	uint32_t aff3, aff2, aff1;
+	uint64_t sgi_val;
+
+	__ASSERT_NO_MSG(GIC_IS_SGI(sgi_id));
+
+	/* Extract affinity fields from target */
+	aff1 = MPIDR_AFFLVL(target_aff, 1);
+	aff2 = MPIDR_AFFLVL(target_aff, 2);
+	aff3 = MPIDR_AFFLVL(target_aff, 3);
+
+	sgi_val = GICV3_SGIR_VALUE(aff3, aff2, aff1, sgi_id,
+				   SGIR_IRM_TO_AFF, target_list);
+
+	__DSB();
+	write_sysreg(sgi_val, ICC_SGI1R);
+	__ISB();
 }
 
 /*
@@ -190,7 +213,7 @@ static void gicv3_cpuif_init(void)
 		write_sysreg(icc_sre, ICC_SRE_EL1);
 		icc_sre = read_sysreg(ICC_SRE_EL1);
 
-		assert(icc_sre & ICC_SRE_ELx_SRE);
+		__ASSERT_NO_MSG(icc_sre & ICC_SRE_ELx_SRE);
 	}
 
 	write_sysreg(GIC_IDLE_PRIO, ICC_PMR_EL1);

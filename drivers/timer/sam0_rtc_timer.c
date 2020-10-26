@@ -138,7 +138,7 @@ static void rtc_reset(void)
 #endif
 }
 
-static void rtc_isr(void *arg)
+static void rtc_isr(const void *arg)
 {
 	ARG_UNUSED(arg);
 
@@ -175,7 +175,7 @@ static void rtc_isr(void *arg)
 #endif /* CONFIG_TICKLESS_KERNEL */
 }
 
-int z_clock_driver_init(struct device *device)
+int z_clock_driver_init(const struct device *device)
 {
 	ARG_UNUSED(device);
 
@@ -203,6 +203,10 @@ int z_clock_driver_init(struct device *device)
 	uint16_t ctrl = RTC_MODE0_CTRL_MODE(0) | RTC_MODE0_CTRL_PRESCALER(0);
 #else
 	uint16_t ctrl = RTC_MODE0_CTRLA_MODE(0) | RTC_MODE0_CTRLA_PRESCALER(0);
+#endif
+
+#ifdef RTC_MODE0_CTRLA_COUNTSYNC
+	ctrl |= RTC_MODE0_CTRLA_COUNTSYNC;
 #endif
 
 #ifndef CONFIG_TICKLESS_KERNEL
@@ -254,7 +258,7 @@ void z_clock_set_timeout(int32_t ticks, bool idle)
 
 #ifdef CONFIG_TICKLESS_KERNEL
 
-	ticks = (ticks == K_FOREVER) ? MAX_TICKS : ticks;
+	ticks = (ticks == K_TICKS_FOREVER) ? MAX_TICKS : ticks;
 	ticks = MAX(MIN(ticks - 1, (int32_t) MAX_TICKS), 0);
 
 	/* Compute number of RTC cycles until the next timeout. */
@@ -274,8 +278,8 @@ void z_clock_set_timeout(int32_t ticks, bool idle)
 
 #else /* !CONFIG_TICKLESS_KERNEL */
 
-	if (ticks == K_FOREVER) {
-		/* Disable comparator for K_FOREVER and other negative
+	if (ticks == K_TICKS_FOREVER) {
+		/* Disable comparator for K_TICKS_FOREVER and other negative
 		 * values.
 		 */
 		rtc_timeout = rtc_counter;

@@ -6,6 +6,7 @@ import argparse
 import os
 import pathlib
 import shlex
+import sys
 
 from west import log
 from west.configuration import config
@@ -149,7 +150,7 @@ class Build(Forceable):
             pristine = args.pristine
         else:
             # Load the pristine={auto, always, never} configuration value
-            pristine = config_get('pristine', 'never')
+            pristine = config_get('pristine', 'auto')
             if pristine not in ['auto', 'always', 'never']:
                 log.wrn(
                     'treating unknown build.pristine value "{}" as "never"'.
@@ -404,7 +405,8 @@ class Build(Forceable):
         # to Just Work:
         #
         # west build -- -DOVERLAY_CONFIG=relative-path.conf
-        final_cmake_args = ['-B{}'.format(self.build_dir),
+        final_cmake_args = ['-DWEST_PYTHON={}'.format(sys.executable),
+                            '-B{}'.format(self.build_dir),
                             '-S{}'.format(self.source_dir),
                             '-G{}'.format(config_get('generator',
                                                      DEFAULT_CMAKE_GENERATOR))]

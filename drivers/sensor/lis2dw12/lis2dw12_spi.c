@@ -97,9 +97,9 @@ stmdev_ctx_t lis2dw12_spi_ctx = {
 	.write_reg = (stmdev_write_ptr) lis2dw12_spi_write,
 };
 
-int lis2dw12_spi_init(struct device *dev)
+int lis2dw12_spi_init(const struct device *dev)
 {
-	struct lis2dw12_data *data = dev->driver_data;
+	struct lis2dw12_data *data = dev->data;
 
 	data->ctx = &lis2dw12_spi_ctx;
 	data->ctx->handle = data;
@@ -114,6 +114,7 @@ int lis2dw12_spi_init(struct device *dev)
 	}
 
 	data->cs_ctrl.gpio_pin = DT_INST_SPI_DEV_CS_GPIOS_PIN(0);
+	data->cs_ctrl.gpio_dt_flags = DT_INST_SPI_DEV_CS_GPIOS_FLAGS(0);
 	data->cs_ctrl.delay = 0U;
 
 	lis2dw12_spi_conf.cs = &data->cs_ctrl;

@@ -128,11 +128,12 @@ config BT_HCI_RESERVE
 config BT_RECV_IS_RX_THREAD
 	# Hidden option set by the HCI driver to indicate that there's
 	# no need for the host to have its own RX thread.
-	# It is then the responsibility of the HCI driver to call bt_recv_prio
-	# from a higher priority context than bt_recv in order to avoid deadlock.
-	# If the host has its own RX thread it is safe to call bt_recv and
-	# bt_recv_prio from the same priority context.
+	# If this option has been enabled it is then the responsibility of the
+	# HCI driver to call bt_recv_prio from a higher priority context than
+	# bt_recv in order to avoid deadlocks.
+	# If this option is disabled then only bt_recv should be called.
 	bool
+	prompt "bt_recv is called from RX thread" if BT_NO_DRIVER
 
 config BT_RX_STACK_SIZE
 	int "Size of the receiving thread stack"
@@ -141,9 +142,6 @@ config BT_RX_STACK_SIZE
 	default 2048 if BT_MESH
 	default 2200 if BT_SETTINGS
 	default 1024
-	range 512 65536 if BT_HCI_RAW
-	range 1100 65536 if BT_MESH
-	range 1024 65536
 	help
 	  Size of the receiving thread stack. This is the context from
 	  which all event callbacks to the application occur. The
@@ -158,7 +156,14 @@ config BT_RX_PRIO
 	depends on BT_HCI_HOST || BT_RECV_IS_RX_THREAD
 	default 8
 
+config BT_DRIVER_RX_HIGH_PRIO
+	# Hidden option for Co-Operative HCI driver RX thread priority
+	int
+	default 6
+
 if BT_HCI_HOST
+
+source "subsys/bluetooth/host/audio/Kconfig"
 
 config BT_HOST_CRYPTO
 	# Hidden option that compiles in random number generation and AES
@@ -599,11 +604,11 @@ config BT_ECC
 	  This option adds support for ECDH HCI commands.
 
 config BT_TINYCRYPT_ECC
-	bool "Use TinyCrypt library for ECDH"
+	bool "Emulate ECDH in the Host using TinyCrypt library"
 	select TINYCRYPT
 	select TINYCRYPT_ECC_DH
 	depends on BT_ECC && (BT_HCI_RAW || BT_HCI_HOST)
-	default y if BT_CTLR
+	default y if BT_CTLR && !BT_CTLR_ECDH
 	help
 	  If this option is set TinyCrypt library is used for emulating the
 	  ECDH HCI commands and events needed by e.g. LE Secure Connections.
@@ -730,6 +735,17 @@ config BT_TESTING
 	help
 	  This option enables custom Bluetooth testing interface.
 	  Shall only be used for testing purposes.
+
+config BT_CONN_DISABLE_SECURITY
+	bool "Disable security"
+	depends on BT_TESTING
+	help
+	  This option disables security checks for incoming requests enabling
+	  to test accessing GATT attributes and L2CAP channels that would
+	  otherwise require encryption/authentication in order to be accessed.
+
+	  WARNING: This option enables anyone to snoop on-air traffic.
+	  Use of this feature in production is strongly discouraged.
 
 config BT_BREDR
 	bool "Bluetooth BR/EDR support [EXPERIMENTAL]"

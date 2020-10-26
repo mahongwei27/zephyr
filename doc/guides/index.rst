@@ -10,6 +10,8 @@ User and Developer Guides
    beyond-GSG.rst
    bluetooth/index.rst
    build/index
+   coding_guidelines/index
+   design_guidelines.rst
    c_library
    ../README.rst
    documentation/index
@@ -33,3 +35,4 @@ User and Developer Guides
    west/index
    optimizations/index
    zephyr_cmake_package.rst
+   thread_local_storage.rst

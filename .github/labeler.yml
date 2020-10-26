@@ -10,17 +10,32 @@
   - "drivers/adc/**/*"
 "area: Counter":
   - "drivers/counter/**/*"
+"area: CAN":
+  - "include/drivers/can.h"
+  - "include/canbus/*/**"
+  - "drivers/can/**/*"
+  - "subsys/canbus/*/**"
+"area: EEPROM":
+  - "include/drivers/eeprom.h"
+  - "drivers/eeprom/**/*"
 "area: Timer":
   - "drivers/timer/**/*"
 "area: I2S":
   - "drivers/i2s/**/*"
 "area: C Library":
   - "lib/libc/**/*"
-"area: Device Tree":
+"area: Devicetree":
   - "dts/**/*"
   - "**/*.dts"
+  - "**/*.dtsi"
+  - "include/devicetree.h"
   - "include/devicetree/*"
+  - "doc/guides/dts/**/*"
+"area: Devicetree Binding":
   - "include/dt-bindings/**/*"
+  - "dts/bindings/**/*"
+"area: Devicetree Tooling":
+  - "scripts/dts/**/*"
 "area: I2C":
   - "drivers/i2c/**/*"
 "area: SPI":
@@ -40,6 +55,9 @@
 "area: ARM":
   - "arch/arm/**/*"
   - "include/arch/arm/**/*"
+"area: ARM_64":
+  - "arch/arm/core/aarch64/**/*"
+  - "include/arch/arm/aarch64/**/*"
 "area: NIOS2":
   - "arch/nios2/**/*"
   - "include/arch/nios2/**/*"
@@ -107,3 +125,30 @@
 "area: Modules":
   - "west.yml"
   - "modules/**/*"
+"area: Shields":
+  - "boards/shields/**"
+  - "samples/shields/**"
+"platform: NXP":
+  - "boards/arm/frdm*/**"
+  - "boards/arm/hexiwear*/**"
+  - "boards/arm/lpcxpresso*/**"
+  - "boards/arm/*imx*/**"
+  - "drivers/**/*imx*"
+  - "drivers/**/*mcux*"
+  - "dts/arm/nxp/*/*"
+  - "dts/bindings/**/nxp*"
+  - "soc/arm/nxp*/**"
+"platform: STM32":
+  - "boards/arm/nucleo_*/**"
+  - "boards/arm/*stm32*/**"
+  - "drivers/**/*stm32*"
+  - "dts/arm/st/*/*"
+  - "include/drivers/*/*stm32*"
+  - "soc/arm/st_stm32/**"
+"platform: SiLabs":
+  - "boards/arm/efr32_*/**/*"
+  - "boards/arm/efm32_*/**/*"
+  - "drivers/**/*gecko*"
+  - "dts/arm/silabs/**/*"
+  - "dts/bindings/**/silabs,gecko*"
+  - "soc/arm/silabs_exx32/**/*"

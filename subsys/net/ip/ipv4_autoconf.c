@@ -18,6 +18,7 @@ LOG_MODULE_REGISTER(net_ipv4_autoconf, CONFIG_NET_IPV4_AUTO_LOG_LEVEL);
 #include <net/net_pkt.h>
 #include <net/net_core.h>
 #include <net/net_if.h>
+#include <random/rand32.h>
 
 #include "ipv4_autoconf_internal.h"
 
@@ -194,7 +195,7 @@ static void ipv4_autoconf_send(struct net_if_ipv4_autoconf *ipv4auto)
 			ipv4_autoconf_send_probe(ipv4auto);
 			break;
 		}
-	/* passthrough */
+		__fallthrough;
 	case NET_IPV4_AUTOCONF_ANNOUNCE:
 		if (ipv4auto->announce_cnt <=
 		    (IPV4_AUTOCONF_ANNOUNCE_NUM - 1)) {

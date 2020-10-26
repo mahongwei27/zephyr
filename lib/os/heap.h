@@ -47,7 +47,7 @@
  */
 typedef size_t chunkid_t;
 
-#define CHUNK_UNIT 8
+#define CHUNK_UNIT 8U
 
 typedef struct { char bytes[CHUNK_UNIT]; } chunk_unit_t;
 
@@ -66,8 +66,7 @@ struct z_heap {
 
 static inline bool big_heap_chunks(size_t chunks)
 {
-	return IS_ENABLED(CONFIG_SYS_HEAP_ALIGNED_ALLOC)
-		|| sizeof(void *) > 4 || chunks > 0x7fff;
+	return sizeof(void *) > 4U || chunks > 0x7fffU;
 }
 
 static inline bool big_heap_bytes(size_t bytes)
@@ -118,7 +117,7 @@ static inline void chunk_set(struct z_heap *h, chunkid_t c,
 
 static inline bool chunk_used(struct z_heap *h, chunkid_t c)
 {
-	return chunk_field(h, c, SIZE_AND_USED) & 1;
+	return chunk_field(h, c, SIZE_AND_USED) & 1U;
 }
 
 static inline size_t chunk_size(struct z_heap *h, chunkid_t c)
@@ -133,15 +132,15 @@ static inline void set_chunk_used(struct z_heap *h, chunkid_t c, bool used)
 
 	if (big_heap(h)) {
 		if (used) {
-			((uint32_t *)cmem)[SIZE_AND_USED] |= 1;
+			((uint32_t *)cmem)[SIZE_AND_USED] |= 1U;
 		} else {
-			((uint32_t *)cmem)[SIZE_AND_USED] &= ~1;
+			((uint32_t *)cmem)[SIZE_AND_USED] &= ~1U;
 		}
 	} else {
 		if (used) {
-			((uint16_t *)cmem)[SIZE_AND_USED] |= 1;
+			((uint16_t *)cmem)[SIZE_AND_USED] |= 1U;
 		} else {
-			((uint16_t *)cmem)[SIZE_AND_USED] &= ~1;
+			((uint16_t *)cmem)[SIZE_AND_USED] &= ~1U;
 		}
 	}
 }
@@ -194,6 +193,11 @@ static inline void set_left_chunk_size(struct z_heap *h, chunkid_t c,
 	chunk_set(h, c, LEFT_SIZE, size);
 }
 
+static inline bool solo_free_header(struct z_heap *h, chunkid_t c)
+{
+	return big_heap(h) && chunk_size(h, c) == 1U;
+}
+
 static inline size_t chunk_header_bytes(struct z_heap *h)
 {
 	return big_heap(h) ? 8 : 4;
@@ -206,7 +210,7 @@ static inline size_t heap_footer_bytes(size_t size)
 
 static inline size_t chunksz(size_t bytes)
 {
-	return (bytes + CHUNK_UNIT - 1) / CHUNK_UNIT;
+	return (bytes + CHUNK_UNIT - 1U) / CHUNK_UNIT;
 }
 
 static inline size_t bytes_to_chunksz(struct z_heap *h, size_t bytes)

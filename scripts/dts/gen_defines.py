@@ -22,6 +22,7 @@ import argparse
 from collections import defaultdict
 import os
 import pathlib
+import pickle
 import re
 import sys
 
@@ -38,7 +39,8 @@ def main():
                          # Suppress this warning if it's suppressed in dtc
                          warn_reg_unit_address_mismatch=
                              "-Wno-simple_bus_reg" not in args.dtc_flags,
-                         default_prop_types=True)
+                         default_prop_types=True,
+                         infer_binding_for_paths=["/zephyr,user"])
     except edtlib.EDTError as e:
         sys.exit(f"devicetree error: {e}")
 
@@ -67,6 +69,7 @@ def main():
         edt.compat2nodes[compat] = sorted(
             nodes, key=lambda node: 0 if node.status == "okay" else 1)
 
+    # Create the generated header.
     with open(args.header_out, "w", encoding="utf-8") as header_file:
         write_top_comment(edt)
 
@@ -84,6 +87,7 @@ def main():
                               f"DT_{node.parent.z_path_id}")
 
             write_child_functions(node)
+            write_dep_info(node)
             write_idents_and_existence(node)
             write_bus(node)
             write_special_props(node)
@@ -91,6 +95,9 @@ def main():
 
         write_chosen(edt)
         write_global_compat_info(edt)
+
+    if args.edt_pickle_out:
+        write_pickled_edt(edt, args.edt_pickle_out)
 
 
 def node_z_path_id(node):
@@ -127,6 +134,8 @@ def parse_args():
     parser.add_argument("--dts-out", required=True,
                         help="path to write merged DTS source code to (e.g. "
                              "as a debugging aid)")
+    parser.add_argument("--edt-pickle-out",
+                        help="path to write pickled edtlib.EDT object to")
 
     return parser.parse_args()
 
@@ -144,10 +153,10 @@ DTS input file:
 Directories with bindings:
   {", ".join(map(relativize, edt.bindings_dirs))}
 
-Nodes in dependency order (ordinal and path):
+Node dependency ordering (ordinal and path):
 """
 
-    for scc in edt.scc_order():
+    for scc in edt.scc_order:
         if len(scc) > 1:
             err("cycle in devicetree involving "
                 + ", ".join(node.path for node in scc))
@@ -167,26 +176,20 @@ def write_node_comment(node):
     s = f"""\
 Devicetree node: {node.path}
 
-Node's generated path identifier: DT_{node.z_path_id}
+Node identifier: DT_{node.z_path_id}
 """
 
     if node.matching_compat:
-        s += f"""
+        if node.binding_path:
+            s += f"""
 Binding (compatible = {node.matching_compat}):
   {relativize(node.binding_path)}
 """
-
-    s += f"\nDependency Ordinal: {node.dep_ordinal}\n"
-
-    if node.depends_on:
-        s += "\nRequires:\n"
-        for dep in node.depends_on:
-            s += f"  {dep.dep_ordinal:<3} {dep.path}\n"
-
-    if node.required_by:
-        s += "\nSupports:\n"
-        for req in node.required_by:
-            s += f"  {req.dep_ordinal:<3} {req.path}\n"
+        else:
+            s += f"""
+Binding (compatible = {node.matching_compat}):
+  No yaml (bindings inferred from properties)
+"""
 
     if node.description:
         # Indent description by two spaces
@@ -444,6 +447,31 @@ def write_vanilla_props(node):
             out_dt_define(macro, val)
     else:
         out_comment("(No generic property macros)")
+
+
+def write_dep_info(node):
+    # Write dependency-related information about the node.
+
+    def fmt_dep_list(dep_list):
+        if dep_list:
+            # Sort the list by dependency ordinal for predictability.
+            sorted_list = sorted(dep_list, key=lambda node: node.dep_ordinal)
+            return "\\\n\t" + \
+                " \\\n\t".join(f"{n.dep_ordinal}, /* {n.path} */"
+                               for n in sorted_list)
+        else:
+            return "/* nothing */"
+
+    out_comment("Node's dependency ordinal:")
+    out_dt_define(f"{node.z_path_id}_ORD", node.dep_ordinal)
+
+    out_comment("Ordinals for what this node depends on directly:")
+    out_dt_define(f"{node.z_path_id}_REQUIRES_ORDS",
+                  fmt_dep_list(node.depends_on))
+
+    out_comment("Ordinals for what depends directly on this node:")
+    out_dt_define(f"{node.z_path_id}_SUPPORTS_ORDS",
+                  fmt_dep_list(node.required_by))
 
 
 def prop2value(prop):
@@ -711,6 +739,21 @@ def quote_str(s):
     # backslashes within it
 
     return f'"{escape(s)}"'
+
+
+def write_pickled_edt(edt, out_file):
+    # Writes the edt object in pickle format to out_file.
+
+    with open(out_file, 'wb') as f:
+        # Pickle protocol version 4 is the default as of Python 3.8
+        # and was introduced in 3.4, so it is both available and
+        # recommended on all versions of Python that Zephyr supports
+        # (at time of writing, Python 3.6 was Zephyr's minimum
+        # version, and 3.8 the most recent CPython release).
+        #
+        # Using a common protocol version here will hopefully avoid
+        # reproducibility issues in different Python installations.
+        pickle.dump(edt, f, protocol=4)
 
 
 def err(s):

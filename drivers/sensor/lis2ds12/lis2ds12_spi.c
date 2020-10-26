@@ -151,9 +151,9 @@ static const struct lis2ds12_transfer_function lis2ds12_spi_transfer_fn = {
 	.update_reg = lis2ds12_spi_update_reg,
 };
 
-int lis2ds12_spi_init(struct device *dev)
+int lis2ds12_spi_init(const struct device *dev)
 {
-	struct lis2ds12_data *data = dev->driver_data;
+	struct lis2ds12_data *data = dev->data;
 
 	data->hw_tf = &lis2ds12_spi_transfer_fn;
 
@@ -167,6 +167,7 @@ int lis2ds12_spi_init(struct device *dev)
 	}
 
 	lis2ds12_cs_ctrl.gpio_pin = DT_INST_SPI_DEV_CS_GPIOS_PIN(0);
+	lis2ds12_cs_ctrl.gpio_dt_flags = DT_INST_SPI_DEV_CS_GPIOS_FLAGS(0);
 	lis2ds12_cs_ctrl.delay = 0U;
 
 	lis2ds12_spi_conf.cs = &lis2ds12_cs_ctrl;

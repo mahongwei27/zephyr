@@ -25,6 +25,7 @@ LOG_MODULE_REGISTER(net_test, CONFIG_NET_ARP_LOG_LEVEL);
 #include <net/net_ip.h>
 #include <net/dummy.h>
 #include <ztest.h>
+#include <random/rand32.h>
 
 #include "arp.h"
 
@@ -49,18 +50,18 @@ struct net_arp_context {
 	struct net_linkaddr ll_addr;
 };
 
-int net_arp_dev_init(struct device *dev)
+int net_arp_dev_init(const struct device *dev)
 {
-	struct net_arp_context *net_arp_context = dev->driver_data;
+	struct net_arp_context *net_arp_context = dev->data;
 
 	net_arp_context = net_arp_context;
 
 	return 0;
 }
 
-static uint8_t *net_arp_get_mac(struct device *dev)
+static uint8_t *net_arp_get_mac(const struct device *dev)
 {
-	struct net_arp_context *context = dev->driver_data;
+	struct net_arp_context *context = dev->data;
 
 	if (context->mac_addr[2] == 0x00) {
 		/* 00-00-5E-00-53-xx Documentation RFC 7042 */
@@ -82,7 +83,7 @@ static void net_arp_iface_init(struct net_if *iface)
 	net_if_set_link_addr(iface, mac, 6, NET_LINK_ETHERNET);
 }
 
-static int tester_send(struct device *dev, struct net_pkt *pkt)
+static int tester_send(const struct device *dev, struct net_pkt *pkt)
 {
 	struct net_eth_hdr *hdr;
 

@@ -761,8 +761,7 @@ static int audio_custom_handler(struct usb_setup_packet *pSetup, int32_t *len,
 static int audio_class_handle_req(struct usb_setup_packet *pSetup,
 				  int32_t *len, uint8_t **data)
 {
-	LOG_INF("bmRequestType 0x%02x, bRequest 0x%02x, wValue 0x%04x,"
-		"wIndex 0x%04x, wLength 0x%04x",
+	LOG_DBG("bmRT 0x%02x, bR 0x%02x, wV 0x%04x, wI 0x%04x, wL 0x%04x",
 		pSetup->bmRequestType, pSetup->bRequest, pSetup->wValue,
 		pSetup->wIndex, pSetup->wLength);
 
@@ -775,7 +774,7 @@ static int audio_class_handle_req(struct usb_setup_packet *pSetup,
 	}
 }
 
-static int usb_audio_device_init(struct device *dev)
+static int usb_audio_device_init(const struct device *dev)
 {
 	LOG_DBG("Init Audio Device: dev %p (%s)", dev, dev->name);
 
@@ -789,7 +788,7 @@ static void audio_write_cb(uint8_t ep, int size, void *priv)
 	struct net_buf *buffer = priv;
 
 	dev_data = usb_get_dev_data_by_ep(&usb_audio_data_devlist, ep);
-	audio_dev_data = dev_data->dev->driver_data;
+	audio_dev_data = dev_data->dev->data;
 
 	LOG_DBG("Written %d bytes on ep 0x%02x, *audio_dev_data %p",
 		size, ep, audio_dev_data);
@@ -810,8 +809,8 @@ static void audio_write_cb(uint8_t ep, int size, void *priv)
 int usb_audio_send(const struct device *dev, struct net_buf *buffer,
 		   size_t len)
 {
-	struct usb_audio_dev_data *audio_dev_data = dev->driver_data;
-	struct usb_cfg_data *cfg = (void *)dev->config_info;
+	struct usb_audio_dev_data *audio_dev_data = dev->data;
+	struct usb_cfg_data *cfg = (void *)dev->config;
 	/* EP ISO IN is always placed first in the endpoint table */
 	uint8_t ep = cfg->endpoint[0].ep_addr;
 
@@ -840,7 +839,7 @@ int usb_audio_send(const struct device *dev, struct net_buf *buffer,
 
 size_t usb_audio_get_in_frame_size(const struct device *dev)
 {
-	struct usb_audio_dev_data *audio_dev_data = dev->driver_data;
+	struct usb_audio_dev_data *audio_dev_data = dev->data;
 
 	return audio_dev_data->in_frame_size;
 }
@@ -897,11 +896,11 @@ static void audio_receive_cb(uint8_t ep, enum usb_dc_ep_cb_status_code status)
 	}
 }
 
-void usb_audio_register(struct device *dev,
+void usb_audio_register(const struct device *dev,
 			const struct usb_audio_ops *ops)
 {
-	struct usb_audio_dev_data *audio_dev_data = dev->driver_data;
-	const struct usb_cfg_data *cfg = dev->config_info;
+	struct usb_audio_dev_data *audio_dev_data = dev->data;
+	const struct usb_cfg_data *cfg = dev->config;
 	const struct std_if_descriptor *iface_descr =
 		cfg->interface_descriptor;
 	const struct cs_ac_if_descriptor *header =
@@ -917,7 +916,7 @@ void usb_audio_register(struct device *dev,
 	sys_slist_append(&usb_audio_data_devlist, &audio_dev_data->common.node);
 
 	LOG_DBG("Device dev %p dev_data %p cfg %p added to devlist %p",
-		dev, audio_dev_data, dev->config_info,
+		dev, audio_dev_data, dev->config,
 		&usb_audio_data_devlist);
 }
 

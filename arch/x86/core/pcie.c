@@ -5,6 +5,7 @@
  */
 
 #include <kernel.h>
+#include <sys/device_mmio.h>
 #include <drivers/pcie/pcie.h>
 
 #ifdef CONFIG_ACPI
@@ -16,6 +17,7 @@
 #endif
 
 /* PCI Express Extended Configuration Mechanism (MMIO) */
+#ifdef CONFIG_PCIE_MMIO_CFG
 
 #define MAX_PCI_BUS_SEGMENTS 4
 
@@ -25,21 +27,33 @@ static struct {
 	uint8_t *mmio;
 } bus_segs[MAX_PCI_BUS_SEGMENTS];
 
+static bool do_pcie_mmio_cfg;
+
 static void pcie_mm_init(void)
 {
 #ifdef CONFIG_ACPI
 	struct acpi_mcfg *m = z_acpi_find_table(ACPI_MCFG_SIGNATURE);
 
 	if (m != NULL) {
-		int n = (m->sdt.len - sizeof(*m)) / sizeof(m->pci_segs[0]);
+		int n = (m->sdt.length - sizeof(*m)) / sizeof(m->pci_segs[0]);
 
 		for (int i = 0; i < n && i < MAX_PCI_BUS_SEGMENTS; i++) {
+			size_t size;
+			uintptr_t phys_addr;
+
 			bus_segs[i].start_bus = m->pci_segs[i].start_bus;
 			bus_segs[i].n_buses = 1 + m->pci_segs[i].end_bus
 				- m->pci_segs[i].start_bus;
-			bus_segs[i].mmio =
-				(void *)(long)m->pci_segs[i].base_addr;
+
+			phys_addr = m->pci_segs[i].base_addr;
+			/* 32 devices & 8 functions per bus, 4k per device */
+			size = bus_segs[i].n_buses * (32 * 8 * 4096);
+
+			device_map((mm_reg_t *)&bus_segs[i].mmio, phys_addr,
+				   size, K_MEM_CACHE_NONE);
 		}
+
+		do_pcie_mmio_cfg = true;
 	}
 #endif
 }
@@ -47,10 +61,6 @@ static void pcie_mm_init(void)
 static inline void pcie_mm_conf(pcie_bdf_t bdf, unsigned int reg,
 				bool write, uint32_t *data)
 {
-	if (bus_segs[0].mmio == NULL) {
-		pcie_mm_init();
-	}
-
 	for (int i = 0; i < ARRAY_SIZE(bus_segs); i++) {
 		int off = PCIE_BDF_TO_BUS(bdf) - bus_segs[i].start_bus;
 
@@ -60,7 +70,7 @@ static inline void pcie_mm_conf(pcie_bdf_t bdf, unsigned int reg,
 				       PCIE_BDF_TO_FUNC(bdf));
 
 			volatile uint32_t *regs
-				= (void *)&bus_segs[0].mmio[bdf << 4];
+				= (void *)&bus_segs[i].mmio[bdf << 4];
 
 			if (write) {
 				regs[reg] = *data;
@@ -71,16 +81,7 @@ static inline void pcie_mm_conf(pcie_bdf_t bdf, unsigned int reg,
 	}
 }
 
-void z_pcie_add_mmu_regions(void)
-{
-	for (int i = 0; i < ARRAY_SIZE(bus_segs); i++) {
-		/* 32 devices & 8 functions per bus, 4k per device */
-		uintptr_t sz = bus_segs[i].n_buses * (32 * 8 * 4096);
-
-		z_x86_add_mmu_region((uintptr_t) bus_segs[i].mmio,
-				     sz, MMU_ENTRY_READ | MMU_ENTRY_WRITE);
-	}
-}
+#endif /* CONFIG_PCIE_MMIO_CFG */
 
 /* Traditional Configuration Mechanism */
 
@@ -124,10 +125,17 @@ static inline void pcie_conf(pcie_bdf_t bdf, unsigned int reg,
 
 {
 #ifdef CONFIG_PCIE_MMIO_CFG
-	pcie_mm_conf(bdf, reg, write, data);
-#else
-	pcie_io_conf(bdf, reg, write, data);
+	if (bus_segs[0].mmio == NULL) {
+		pcie_mm_init();
+	}
+
+	if (do_pcie_mmio_cfg) {
+		pcie_mm_conf(bdf, reg, write, data);
+	} else
 #endif
+	{
+		pcie_io_conf(bdf, reg, write, data);
+	}
 }
 
 /* these functions are explained in include/drivers/pcie/pcie.h */

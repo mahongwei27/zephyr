@@ -50,7 +50,7 @@ static inline uint64_t rotl(const uint64_t x, int k)
 	return (x << k) | (x >> (64 - k));
 }
 
-static int xoroshiro128_initialize(struct device *dev)
+static int xoroshiro128_initialize(const struct device *dev)
 {
 	dev = device_get_binding(DT_CHOSEN_ZEPHYR_ENTROPY_LABEL);
 	if (!dev) {
@@ -87,7 +87,7 @@ static uint32_t xoroshiro128_next(void)
 	return (uint32_t)result;
 }
 
-uint32_t sys_rand32_get(void)
+uint32_t z_impl_sys_rand32_get(void)
 {
 	uint32_t ret;
 
@@ -96,7 +96,7 @@ uint32_t sys_rand32_get(void)
 	return ret;
 }
 
-void sys_rand_get(void *dst, size_t outlen)
+void z_impl_sys_rand_get(void *dst, size_t outlen)
 {
 	uint32_t ret;
 	uint32_t blocksize = 4;

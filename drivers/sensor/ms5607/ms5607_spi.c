@@ -166,9 +166,9 @@ static const struct ms5607_transfer_function ms5607_spi_transfer_function = {
 	.read_adc = ms5607_spi_read_adc,
 };
 
-int ms5607_spi_init(struct device *dev)
+int ms5607_spi_init(const struct device *dev)
 {
-	struct ms5607_data *data = dev->driver_data;
+	struct ms5607_data *data = dev->data;
 
 	data->tf = &ms5607_spi_transfer_function;
 
@@ -181,6 +181,7 @@ int ms5607_spi_init(struct device *dev)
 	}
 
 	ms5607_cs_ctrl.gpio_pin = DT_INST_SPI_DEV_CS_GPIOS_PIN(0);
+	ms5607_cs_ctrl.gpio_dt_flags = DT_INST_SPI_DEV_CS_GPIOS_FLAGS(0);
 	ms5607_cs_ctrl.delay = 0U;
 
 	ms5607_spi_conf.cs = &ms5607_cs_ctrl;

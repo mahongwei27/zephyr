@@ -86,15 +86,15 @@ typedef struct {
 #define Z_FOREVER Z_TIMEOUT_TICKS(K_TICKS_FOREVER)
 
 #ifdef CONFIG_TIMEOUT_64BIT
-# define Z_TIMEOUT_MS(t) Z_TIMEOUT_TICKS(k_ms_to_ticks_ceil64(MAX(t, 0)))
-# define Z_TIMEOUT_US(t) Z_TIMEOUT_TICKS(k_us_to_ticks_ceil64(MAX(t, 0)))
-# define Z_TIMEOUT_NS(t) Z_TIMEOUT_TICKS(k_ns_to_ticks_ceil64(MAX(t, 0)))
-# define Z_TIMEOUT_CYC(t) Z_TIMEOUT_TICKS(k_cyc_to_ticks_ceil64(MAX(t, 0)))
+# define Z_TIMEOUT_MS(t) Z_TIMEOUT_TICKS((k_ticks_t)k_ms_to_ticks_ceil64(MAX(t, 0)))
+# define Z_TIMEOUT_US(t) Z_TIMEOUT_TICKS((k_ticks_t)k_us_to_ticks_ceil64(MAX(t, 0)))
+# define Z_TIMEOUT_NS(t) Z_TIMEOUT_TICKS((k_ticks_t)k_ns_to_ticks_ceil64(MAX(t, 0)))
+# define Z_TIMEOUT_CYC(t) Z_TIMEOUT_TICKS((k_ticks_t)k_cyc_to_ticks_ceil64(MAX(t, 0)))
 #else
-# define Z_TIMEOUT_MS(t) Z_TIMEOUT_TICKS(k_ms_to_ticks_ceil32(MAX(t, 0)))
-# define Z_TIMEOUT_US(t) Z_TIMEOUT_TICKS(k_us_to_ticks_ceil32(MAX(t, 0)))
-# define Z_TIMEOUT_NS(t) Z_TIMEOUT_TICKS(k_ns_to_ticks_ceil32(MAX(t, 0)))
-# define Z_TIMEOUT_CYC(t) Z_TIMEOUT_TICKS(k_cyc_to_ticks_ceil32(MAX(t, 0)))
+# define Z_TIMEOUT_MS(t) Z_TIMEOUT_TICKS((k_ticks_t)k_ms_to_ticks_ceil32(MAX(t, 0)))
+# define Z_TIMEOUT_US(t) Z_TIMEOUT_TICKS((k_ticks_t)k_us_to_ticks_ceil32(MAX(t, 0)))
+# define Z_TIMEOUT_NS(t) Z_TIMEOUT_TICKS((k_ticks_t)k_ns_to_ticks_ceil32(MAX(t, 0)))
+# define Z_TIMEOUT_CYC(t) Z_TIMEOUT_TICKS((k_ticks_t)k_cyc_to_ticks_ceil32(MAX(t, 0)))
 #endif
 
 /* Converts between absolute timeout expiration values (packed into
@@ -168,20 +168,8 @@ extern void z_enable_sys_clock(void);
 
 #endif
 
-#define __ticks_to_ms(t) __DEPRECATED_MACRO \
-	k_ticks_to_ms_floor64((uint64_t)(t))
 #define z_ms_to_ticks(t) \
 	((int32_t)k_ms_to_ticks_ceil32((uint32_t)(t)))
-#define __ticks_to_us(t) __DEPRECATED_MACRO \
-	((int32_t)k_ticks_to_us_floor32((uint32_t)(t)))
-#define z_us_to_ticks(t) __DEPRECATED_MACRO \
-	((int32_t)k_us_to_ticks_ceil32((uint32_t)(t)))
-#define sys_clock_hw_cycles_per_tick() __DEPRECATED_MACRO \
-	((int)k_ticks_to_cyc_floor32(1U))
-#define SYS_CLOCK_HW_CYCLES_TO_NS64(t) __DEPRECATED_MACRO \
-	k_cyc_to_ns_floor64((uint64_t)(t))
-#define SYS_CLOCK_HW_CYCLES_TO_NS(t) __DEPRECATED_MACRO \
-	((uint32_t)k_cyc_to_ns_floor64(t))
 
 /* added tick needed to account for tick in progress */
 #define _TICK_ALIGN 1

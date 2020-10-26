@@ -10,6 +10,7 @@ LOG_MODULE_REGISTER(net_mqtt_publisher_sample, LOG_LEVEL_DBG);
 #include <zephyr.h>
 #include <net/socket.h>
 #include <net/mqtt.h>
+#include <random/rand32.h>
 
 #include <string.h>
 #include <errno.h>
@@ -49,7 +50,7 @@ static APP_BMEM struct sockaddr_storage broker;
 static APP_BMEM struct sockaddr socks5_proxy;
 #endif
 
-static APP_BMEM struct pollfd fds[1];
+static APP_BMEM struct zsock_pollfd fds[1];
 static APP_BMEM int nfds;
 
 static APP_BMEM bool connected;
@@ -129,7 +130,7 @@ static int wait(int timeout)
 	int ret = 0;
 
 	if (nfds > 0) {
-		ret = poll(fds, nfds, timeout);
+		ret = zsock_poll(fds, nfds, timeout);
 		if (ret < 0) {
 			LOG_ERR("poll error: %d", errno);
 		}
@@ -268,27 +269,27 @@ static void broker_init(void)
 
 	broker6->sin6_family = AF_INET6;
 	broker6->sin6_port = htons(SERVER_PORT);
-	inet_pton(AF_INET6, SERVER_ADDR, &broker6->sin6_addr);
+	zsock_inet_pton(AF_INET6, SERVER_ADDR, &broker6->sin6_addr);
 
 #if defined(CONFIG_SOCKS)
 	struct sockaddr_in6 *proxy6 = (struct sockaddr_in6 *)&socks5_proxy;
 
 	proxy6->sin6_family = AF_INET6;
 	proxy6->sin6_port = htons(SOCKS5_PROXY_PORT);
-	inet_pton(AF_INET6, SOCKS5_PROXY_ADDR, &proxy6->sin6_addr);
+	zsock_inet_pton(AF_INET6, SOCKS5_PROXY_ADDR, &proxy6->sin6_addr);
 #endif
 #else
 	struct sockaddr_in *broker4 = (struct sockaddr_in *)&broker;
 
 	broker4->sin_family = AF_INET;
 	broker4->sin_port = htons(SERVER_PORT);
-	inet_pton(AF_INET, SERVER_ADDR, &broker4->sin_addr);
+	zsock_inet_pton(AF_INET, SERVER_ADDR, &broker4->sin_addr);
 #if defined(CONFIG_SOCKS)
 	struct sockaddr_in *proxy4 = (struct sockaddr_in *)&socks5_proxy;
 
 	proxy4->sin_family = AF_INET;
 	proxy4->sin_port = htons(SOCKS5_PROXY_PORT);
-	inet_pton(AF_INET, SOCKS5_PROXY_ADDR, &proxy4->sin_addr);
+	zsock_inet_pton(AF_INET, SOCKS5_PROXY_ADDR, &proxy4->sin_addr);
 #endif
 #endif
 }
@@ -377,7 +378,7 @@ static int try_to_connect(struct mqtt_client *client)
 
 		prepare_fds(client);
 
-		if (wait(APP_SLEEP_MSECS)) {
+		if (wait(APP_CONNECT_TIMEOUT_MS)) {
 			mqtt_input(client);
 		}
 

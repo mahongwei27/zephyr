@@ -98,7 +98,7 @@ static int8_t spi_rw(uint8_t *mosi, uint8_t *miso, uint16_t size)
 
 struct winc1500_gpio_configuration *winc1500_configure_gpios(void)
 {
-	struct device *gpio_en, *gpio_irq, *gpio_reset;
+	const struct device *gpio_en, *gpio_irq, *gpio_reset;
 
 	gpio_en = device_get_binding(
 		DT_INST_GPIO_LABEL(0, enable_gpios));
@@ -155,6 +155,7 @@ int8_t nm_bus_init(void *pvinit)
 	}
 
 	cs_ctrl.gpio_pin = DT_INST_SPI_DEV_CS_GPIOS_PIN(0);
+	cs_ctrl.gpio_dt_flags = DT_INST_SPI_DEV_CS_GPIOS_FLAGS(0);
 	cs_ctrl.delay = 0U;
 
 	winc1500.spi_cfg.cs = &cs_ctrl;

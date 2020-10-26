@@ -29,13 +29,34 @@ extern "C" {
 #define _CWJAP  "CWJAP_CUR"
 #define _CIPSTA "CIPSTA_CUR"
 #define _CIPSTAMAC "CIPSTAMAC_CUR"
+#define _CIPRECVDATA "+CIPRECVDATA,"
+#define _CIPRECVDATA_END ':'
 #else
 #define _CWMODE "CWMODE"
 #define _CWSAP  "CWSAP"
 #define _CWJAP  "CWJAP"
 #define _CIPSTA "CIPSTA"
 #define _CIPSTAMAC "CIPSTAMAC"
+#define _CIPRECVDATA "+CIPRECVDATA:"
+#define _CIPRECVDATA_END ','
 #endif
+
+/*
+ * Passive mode differs a bit between firmware versions and the macro
+ * ESP_PROTO_PASSIVE is therefore used to determine what protocol operates in
+ * passive mode. For AT version 1.7 passive mode only affects TCP but in AT
+ * version 2.0 it affects both TCP and UDP.
+ */
+#if defined(CONFIG_WIFI_ESP_PASSIVE_MODE)
+#if defined(CONFIG_WIFI_ESP_AT_VERSION_1_7)
+#define ESP_PROTO_PASSIVE(proto) (proto == IPPROTO_TCP)
+#else
+#define ESP_PROTO_PASSIVE(proto) \
+	(proto == IPPROTO_TCP || proto == IPPROTO_UDP)
+#endif /* CONFIG_WIFI_ESP_AT_VERSION_1_7 */
+#else
+#define ESP_PROTO_PASSIVE(proto) 0
+#endif /* CONFIG_WIFI_ESP_PASSIVE_MODE */
 
 #define ESP_BUS DT_BUS(DT_DRV_INST(0))
 
@@ -45,8 +66,14 @@ extern "C" {
 #define _FLOW_CONTROL "0"
 #endif
 
+#if DT_INST_NODE_HAS_PROP(0, target_speed)
+#define _UART_BAUD	DT_INST_PROP(0, target_speed)
+#else
+#define _UART_BAUD	DT_PROP(ESP_BUS, current_speed)
+#endif
+
 #define _UART_CUR \
-	STRINGIFY(DT_PROP(ESP_BUS, current_speed))",8,1,0,"_FLOW_CONTROL
+	STRINGIFY(_UART_BAUD)",8,1,0,"_FLOW_CONTROL
 
 #define CONN_CMD_MAX_LEN (sizeof("AT+"_CWJAP"=\"\",\"\"") + \
 			  WIFI_SSID_MAX_LEN + WIFI_PSK_MAX_LEN)
@@ -59,9 +86,9 @@ extern "C" {
 
 #define INVALID_LINK_ID		255
 
-#define MDM_RING_BUF_SIZE	1024
-#define MDM_RECV_MAX_BUF	30
-#define MDM_RECV_BUF_SIZE	128
+#define MDM_RING_BUF_SIZE	CONFIG_WIFI_ESP_MDM_RING_BUF_SIZE
+#define MDM_RECV_MAX_BUF	CONFIG_WIFI_ESP_MDM_RX_BUF_COUNT
+#define MDM_RECV_BUF_SIZE	CONFIG_WIFI_ESP_MDM_RX_BUF_SIZE
 #define CMD_BUF_ALLOC_TIMEOUT	K_SECONDS(1)
 
 #define ESP_CMD_TIMEOUT		K_SECONDS(10)
@@ -142,7 +169,6 @@ struct esp_data {
 
 	/* modem interface */
 	struct modem_iface_uart_data iface_data;
-	uint8_t iface_isr_buf[MDM_RECV_BUF_SIZE];
 	uint8_t iface_rb_buf[MDM_RING_BUF_SIZE];
 
 	/* modem cmds */
@@ -163,9 +189,10 @@ struct esp_data {
 
 	scan_result_cb_t scan_cb;
 
-	/* response semaphore */
+	/* semaphores */
 	struct k_sem sem_tx_ready;
 	struct k_sem sem_response;
+	struct k_sem sem_if_ready;
 	struct k_sem sem_if_up;
 };
 
